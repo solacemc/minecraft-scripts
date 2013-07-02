@@ -43,7 +43,7 @@ def getChunk(x, z):
 			GlobalChunkCache[chunkCoords] = GlobalLevel.getChunk(x>>4, z>>4)
 		except ChunkNotPresent:
 			return None
-	
+
 	return GlobalChunkCache[chunkCoords]
 
 def blockAt(x, y, z):
@@ -57,57 +57,64 @@ def dataAt(x, y, z):
 	if chunk == None:
 		return 0
 	return chunk.Data[x%16][z%16][y]
-	
+
 def tileEntityAt(x, y, z):
 	chunk = getChunk(x, z)
 	if chunk == None:
 		return 0
 	return chunk.tileEntityAt(x, y, z)
-	
+
 ########## End fast data access ##########
 
 def perform(level, box, options):
 	global GlobalLevel
 	GlobalLevel = level
-	
+
 	if options["Create Spawner"]:
 		spawns = buildStructureSpawners(box)
 		spawns = spawns + deleteGlassSpawners(box)
 		createSpawners(level, box, options, spawns, -3, "Spawn")
-	
+
 	if options["Create Deleter"]:
 		spawns = deleteStructureSpawners(box)
 		createSpawners(level, box, options, spawns, 3, "Delete")
+
+	if options["Create Grass"]:
+		blocks = gatherBoxContents(box)
+		print 'blocks: %s' & blocks
+
+def gatherBoxContents(box):
+	return [12, 23, 32]
 
 def createSpawners(level, box, options, spawns, sdx, text):
 	# Find redstone/spawner coordinates
 	dx = options["dx"]
 	dy = options["dy"]
 	dz = options["dz"]
-	
+
 	if dx == 0:
 		rsx = (box.maxx + box.minx) / 2
 	if dy == 0:
 		rsy = (box.maxy + box.miny) / 2
 	if dz == 0:
 		rsz = (box.maxz + box.minz) / 2
-		
+
 	if dx < 0:
 		rsx = box.minx + dx - 5
 	if dy < 0:
 		rsy = box.miny + dy - 2
 	if dz < 0:
 		rsz = box.minz + dz - 5
-	
+
 	if dx > 0:
 		rsx = box.maxx + dx + 5
 	if dy > 0:
 		rsy = box.maxy + dy + 5
 	if dz > 0:
 		rsz = box.maxz + dz + 2
-		
+
 	rsx = rsx + sdx
-	
+
 	# Create Spawner Carts
 	(_, _, _, _, maxDelay, _) = max(spawns, key=lambda(spos, sblock, sdata, stileEntity, sdelay, stime): sdelay)
 	prevDelayCart = None
@@ -117,14 +124,14 @@ def createSpawners(level, box, options, spawns, sdx, text):
 			if sdelay == delay:
 				sand = fallingSand((spos, sblock, sdata, stileEntity, stime))
 				prevCart = minecartSpawner((rsx+2, rsy, rsz), prevCart, sand, False)
-		
+
 		prevDelayCart = minecartSpawner((rsx+2, rsy, rsz), prevDelayCart, prevCart, True)
-	
+
 	cart = minecartSpawner((rsx+2, rsy, rsz), None, prevDelayCart, False)
 	mainCart = minecartSpawner((rsx, rsy, rsz), cart, None, False)
 	mainCart["MinSpawnDelay"] = TAG_Short(32000)
-	mainCart["MaxSpawnDelay"] = TAG_Short(32000)		
-	
+	mainCart["MaxSpawnDelay"] = TAG_Short(32000)
+
 	# Create Spawner Tile Entity and Bogus Cart
 	level.setBlockAt(rsx, rsy-1, rsz, 52)
 	spawner = spawnerTileEntity((rsx, rsy-1, rsz), 1, 1, 1, mainCart)
@@ -132,11 +139,11 @@ def createSpawners(level, box, options, spawns, sdx, text):
 	chunk.TileEntities.append(spawner)
 	bogusCart = minecartSpawner((rsx, rsy, rsz), None, None, False)
 	bogusCart["MinSpawnDelay"] = TAG_Short(32000)
-	bogusCart["MaxSpawnDelay"] = TAG_Short(32000)	
+	bogusCart["MaxSpawnDelay"] = TAG_Short(32000)
 	bogusCart["Delay"] = TAG_Short(32000)
 	chunk.Entities.append(bogusCart)
 	chunk.dirty = True
-	
+
 	# Create scaffolding
 	level.setBlockAt(rsx+2, rsy, rsz, 11) #lava
 	level.setBlockAt(rsx+3, rsy, rsz, 20) #glass
@@ -154,7 +161,7 @@ def createSpawners(level, box, options, spawns, sdx, text):
 	level.setBlockAt(rsx+1, rsy+1, rsz+1, 55), #redstone dust
 	level.setBlockAt(rsx+1, rsy+1, rsz, 93) #repeater
 	level.setBlockDataAt(rsx+1, rsy+1, rsz, 12) #repeater delay
-	
+
 	# Create monostable circuit
 	level.setBlockAt(rsx+1, rsy+1, rsz+3, 1) #stone
 	level.setBlockAt(rsx+1, rsy+1, rsz+5, 1) #stone
@@ -182,7 +189,7 @@ def createSpawners(level, box, options, spawns, sdx, text):
 	depth = box.maxz-box.minz
 	sign = signTileEntity(rsx, rsy+2, rsz+4, text, "{0}x{1}x{2}".format(width, height, depth), "{0} ticks".format(maxDelay+9), "{0} Sand".format(len(spawns)))
 	chunk.TileEntities.append(sign)
-	
+
 def buildStructureSpawners(box):
 	spawns = []
 	for x in xrange(box.minx, box.maxx):
@@ -195,7 +202,7 @@ def buildStructureSpawners(box):
 				if block != 0:
 					spawns.append(((x+0.5, y+0.51, z+0.5), block, dataAt(x, y, z), tileEntityAt(x, y, z), y-box.miny+1, 1))
 					needsSupport = True
-	
+
 	return spawns
 
 def deleteGlassSpawners(box):
@@ -229,9 +236,9 @@ def deleteGlassSpawners(box):
 				elif needsSupport:
 					spawns.append(((x+0.5, y+0.5, z+0.5), 20, 0, None, currentDelay+y-box.miny, 0))
 					currentDrop = currentDrop + 1
-	
+
 	return spawns
-				
+
 def deleteStructureSpawners(box):
 	spawns = []
 
@@ -250,16 +257,16 @@ def deleteStructureSpawners(box):
 						spawns.append(((x+0.5, y+0.75, z+0.5), 44, 0, None, currentDelay-4, 0))
 						spawns.append(((x+0.5, y+0.25, z+0.5), block, dataAt(x, y, z), None, currentDelay-4, 1))
 					break
-				
+
 				if block != 0:
 					spawns.append(((x+0.5, y+0.5, z+0.5), block, dataAt(x, y, z), None, currentDelay+y-box.miny, 0))
 					needsSupport = True
-				
+
 				if needsSupport:
 					currentDrop = currentDrop + 1
-	
+
 	return spawns
-	
+
 def spawnerTileEntity((x, y, z), maxEntities, spawnRange, loopTicks, entity):
 	mobSpawner = TAG_Compound()
 	mobSpawner["id"] = TAG_String(u'MobSpawner')
@@ -275,9 +282,9 @@ def spawnerTileEntity((x, y, z), maxEntities, spawnRange, loopTicks, entity):
 	mobSpawner["x"] = TAG_Int(x)
 	mobSpawner["y"] = TAG_Int(y)
 	mobSpawner["z"] = TAG_Int(z)
-	
+
 	return mobSpawner
-	
+
 def minecartSpawner((cx, cy, cz), spawn1, spawn2, initialDelay=True):
 	spawnerCart = TAG_Compound()
 	spawnerCart["id"] = TAG_String(u'MinecartSpawner')
@@ -289,7 +296,7 @@ def minecartSpawner((cx, cy, cz), spawn1, spawn2, initialDelay=True):
 	spawnerCart["Motion"] = motion
 	spawnerCart["OnGround"] = TAG_Byte(0)
 	spawnerCart["Type"] = TAG_Int(0)
-	
+
 	if initialDelay:
 		# 1 tick delay before first spawn, 1 tick before second
 		spawnerCart["MinSpawnDelay"] = TAG_Short(1)
@@ -300,7 +307,7 @@ def minecartSpawner((cx, cy, cz), spawn1, spawn2, initialDelay=True):
 		spawnerCart["MinSpawnDelay"] = TAG_Short(2)
 		spawnerCart["MaxSpawnDelay"] = TAG_Short(2)
 		spawnerCart["Delay"] = TAG_Short(0)
-	
+
 	spawnerCart["Dimension"] = TAG_Int(0)
 	spawnerCart["Air"] = TAG_Short(300)
 	spawnerCart["SpawnCount"] = TAG_Short(1)
@@ -320,7 +327,7 @@ def minecartSpawner((cx, cy, cz), spawn1, spawn2, initialDelay=True):
 	spawnerCart["Rotation"] = rotation
 	spawnerCart["SpawnRange"] = TAG_Short(1)
 	spawnerCart["Invulnerable"] = TAG_Byte(0)
-	
+
 	if spawn1 == None:
 		bs = bogusSpawn(cx, cz)
 		spawnerCart["SpawnData"] = bs
@@ -328,21 +335,21 @@ def minecartSpawner((cx, cy, cz), spawn1, spawn2, initialDelay=True):
 	else:
 		spawnerCart["SpawnData"] = spawn1
 		spawnerCart["EntityId"] = TAG_String(spawn1["id"].value)
-	
+
 	spawnPotentials = TAG_List()
 	spawnPotential = TAG_Compound()
 	if spawn2 == None:
 		spawnPotential["Properties"] = bogusSpawn(cx, cz)
 	else:
 		spawnPotential["Properties"] = spawn2
-		
+
 	spawnPotential["Weight"] = TAG_Int(1)
 	spawnPotential["Type"] = TAG_String(spawnPotential["Properties"]["id"].value)
 	spawnPotentials.append(spawnPotential)
 	spawnerCart["SpawnPotentials"] = spawnPotentials
 
 	return spawnerCart
-	
+
 def bogusSpawn(cx, cz):
 	properties = TAG_Compound()
 	properties["id"] = TAG_String(u'Item')
@@ -374,9 +381,9 @@ def bogusSpawn(cx, cz):
 	rotation.append(TAG_Float(0))
 	properties["Rotation"] = rotation
 	properties["Invulnerable"] = TAG_Byte(0)
-	
+
 	return properties
-	
+
 def fallingSand(((x, y, z), tile, data, tileEntity, time)):
 	fallingSand = TAG_Compound()
 	fallingSand["id"] = TAG_String(u'FallingSand')
@@ -405,7 +412,7 @@ def fallingSand(((x, y, z), tile, data, tileEntity, time)):
 	rotation.append(TAG_Float(0.0))
 	rotation.append(TAG_Float(0.0))
 	fallingSand["Rotation"] = rotation
-	
+
 	return fallingSand
 
 def lavaDispenser(x, y, z):
@@ -422,9 +429,9 @@ def lavaDispenser(x, y, z):
 	trap["x"] = TAG_Int(x)
 	trap["y"] = TAG_Int(y)
 	trap["z"] = TAG_Int(z)
-	
+
 	return trap
-	
+
 def signTileEntity(x, y, z, text1, text2, text3, text4):
 	sign = TAG_Compound()
 	sign["id"] = TAG_String(u'Sign')
@@ -435,5 +442,5 @@ def signTileEntity(x, y, z, text1, text2, text3, text4):
 	sign["x"] = TAG_Int(x)
 	sign["y"] = TAG_Int(y)
 	sign["z"] = TAG_Int(z)
-	
+
 	return sign
